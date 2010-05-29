@@ -1,0 +1,244 @@
+<html>
+<head>
+<script>
+var openTC = function(tab) {
+    chrome.tabs.create({url: localStorage["server"]});
+}
+
+var openOptions = function(tab) {
+	chrome.tabs.create({url: chrome.extension.getURL("options.html")});
+}
+
+function init() {   
+	function changeListeners(listener) {
+		chrome.browserAction.onClicked.removeListener(openTC);
+		chrome.browserAction.onClicked.removeListener(openOptions);
+		chrome.browserAction.onClicked.addListener(listener);
+	}
+
+    var server = localStorage["server"];
+    if(server) {
+        console.log("server loaded:", server);
+        if(server[server.length - 1] != "/") {
+            server = server + "/";
+            localStorage["server"] = server;
+        }      
+        changeListeners(openTC);
+        statusChecker(server);
+    }
+    else {
+        setBadge("warning", "setup");
+        changeListeners(openOptions);
+        openOptions();
+        console.log("error: no server");
+    }
+}
+
+function setBadge(notification, text) {
+	var color = [0, 255, 0, 255];
+	if(notification == "warning") {
+		color = [255, 0, 255, 255];
+	} else if(notification == "error") {
+		color = [255, 0, 0, 255];
+	} else if(notification == "notice") {
+		color = [0, 0, 255, 255];
+	}
+	chrome.browserAction.setBadgeBackgroundColor({color:color});
+	if(text) {
+		chrome.browserAction.setBadgeText({text:text});
+	}
+}
+
+function statusChecker(server) {	
+	function drawIconAtRotation() {
+		function ease(x) {
+			  return (1-Math.sin(Math.PI/2+x*Math.PI))/2;
+		}
+
+		canvasContext.save();
+	  	canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+	  	canvasContext.translate(Math.ceil(canvas.width/2), Math.ceil(canvas.height/2));
+	  	canvasContext.rotate(2*Math.PI*ease(rotation));
+	  	canvasContext.drawImage(icon,-Math.ceil(canvas.width/2),-Math.ceil(canvas.height/2));
+	  	canvasContext.restore();
+
+	  	chrome.browserAction.setIcon({imageData:canvasContext.getImageData(0, 0,
+	    	canvas.width,canvas.height)});
+	}
+
+	function animateFlip() {
+		var animationSpeed = 10;
+		var animationFrames = 36;
+		rotation = rotation + 1/animationFrames;
+		drawIconAtRotation();
+
+		if (rotation <= 1) {
+		    setTimeout(animateFlip, animationSpeed);
+		} else {
+		    rotation = 0;
+		    drawIconAtRotation();
+		}
+	}
+
+	function checkNewBuilds(statuses) {
+		var lastBuild = localStorage["lastBuild"];
+	    if(statuses.length > 0) {
+		    var lastId = statuses[0].attributes["id"].value;
+            if(!lastBuild) {
+            	lastBuild = lastId;	
+            }
+            
+            if(lastBuild != lastId) {
+            	animateFlip();
+
+            	for(var i=0; i<statuses.length; i++) {
+					var status = statuses[i];
+					if(status.attributes["id"].value == lastBuild) {
+						break;
+					}
+					else {
+		            	ajaxRequest(server + "app/rest/builds/id:" + lastId, buildDetails);   						
+					}
+            	}
+         
+                console.log("New build detected:", lastId);                
+            }		                   
+            localStorage["lastBuild"] = lastId;
+        }
+	}
+
+	function buildDetails(responseXML) {
+		var popupTimeout = 1000 * 5;
+
+		function getVal(name) { 
+			return responseXML.getElementsByTagName(name)[0].firstChild.nodeValue
+		}
+		function getAttr(elName, attrName) { 
+			return responseXML.getElementsByTagName(name)[0].attributes[attrName].value;
+		}
+
+		var build = { 
+			id: getAttr("build", "id"),
+			status: getVal("statusText"),
+			url: getAttr("build", "webUrl"),
+			name: getAttr("buildType", "name"),
+			projectName: getAttr("buildType", "projectName"),
+			projectUrl: getAttr("buildType", "webUrl")
+		};
+
+		var builds = localStorage["builds"];
+		if(!builds) {
+			builds = [];
+		}
+		builds.push(build);
+	}
+	
+	function success(responseXML) {
+        var statuses = responseXML.getElementsByTagName("build");
+        var count = 0;	
+        var buildStatus = {};
+
+        for(var i=0; i < statuses.length; i++) {
+            var a = statuses[i].attributes;
+            var id = a["buildTypeId"].value;
+            if(buildStatus[id] == undefined) {
+                var status = a["status"].value;
+                buildStatus[id] = status;
+                if(status == "FAILURE" || status == "ERROR") { 
+                    count++; 
+                }
+            }
+        }
+
+     	
+        if(count == 0) {
+            setBadge("success", "OK");
+        } else {
+            setBadge("error", count.toString());
+        }	
+
+    	checkNewBuilds(statuses);	  
+        requestFailureCount = 0;
+	}
+
+	var rotation = 0;
+	var canvas = document.getElementById("canvas");
+	var icon = document.getElementById("icon");
+	var canvasContext = canvas.getContext("2d");	
+    animateFlip();
+    ajaxRequest(server + "app/rest/builds", success, 
+    	    function() { setBadge("warning", "?"); }, true);
+}
+
+function ajaxRequest(url, onSuccess, onError, again) {
+	function scheduleRequest() {
+	    var pollIntervalMin = 1000 * 60;  // 1 minute
+	    var pollIntervalMax = 1000 * 60 * 5;  // 5 minutes
+		
+		var randomness = Math.random() * 2;
+	  	var exponent = Math.pow(2, requestFailureCount);
+	  	var delay = Math.min(randomness * pollIntervalMin * exponent, pollIntervalMax);
+	  	delay = Math.round(delay);
+
+	  	console.log("Scheduling request:", delay, "ms");
+	  	window.setTimeout(startRequest, delay);	
+	}
+
+	function startRequest() {	
+		var requestTimeout = 1000 * 10;  // 10 seconds
+		console.log("Starting request");
+	
+		abortTimeoutId = window.setTimeout(function() {
+		    console.log("aborting!");
+		    req.abort();
+		}, requestTimeout);
+	    console.log("  abort timer set:", requestTimeout, "ms");		
+
+	    req.open("GET", url, true);
+		req.send(null);
+		console.log("  GET request sent:", url);
+	}
+
+	function handleStateChange() {
+		try {
+			console.log("  state changed", this.readyState, this.status);
+			if(this.readyState == 4) { // finished
+	            if(this.status == 200 && this.responseXML != null) { // success
+	            	console.log("  success!");
+	            	if(onSuccess) {
+	                	onSuccess(this.responseXML);     
+	            	}
+	            }
+	            else { // failure
+	                console.log("  error");
+	                requestFailureCount++;
+					if(onError) {
+	                	onError();
+					}
+	            }
+
+	            if(abortTimeoutId) { 
+	    		  	console.log("  abort timer cleared");
+	            	window.clearTimeout(abortTimeoutId); 
+	        	}
+	            
+	            if(again) { 
+		            scheduleRequest(); 
+	            };
+	        }
+		} catch(e) { }
+	}
+	
+    var requestFailureCount = 0;  // used for exponential backoff
+    var abortTimeoutId;	
+	var req = new XMLHttpRequest();
+    req.onreadystatechange = handleStateChange;
+    startRequest();	
+}
+</script>
+</head>
+<body onload="init()">
+<img id="icon" src="icon19.png">
+<canvas id="canvas" width="19" height="19">
+</body>
+</html>

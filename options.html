@@ -1,0 +1,57 @@
+<html>
+<head><title>TeamCity Build Status Options</title></head>
+<script type="text/javascript">
+// Saves options to localStorage.
+function save_options() {
+	localStorage["builds"] = null;
+  	var tbox = document.getElementById("server");
+  	localStorage["server"] = tbox.value;
+  	chrome.extension.getBackgroundPage().init();
+}
+
+// Restores select box state to saved value from localStorage.
+function restore_options() {
+  var server = localStorage["server"];
+  if (!server) {
+    return;
+  }
+  var tbox = document.getElementById("server");
+  tbox.value = server;
+}
+</script>
+
+<body onload="restore_options()">	
+	<table>
+		<tr>
+			<td><img src="icon128.png" style="width:64px" /></td>
+			<td style="padding-left:15px;">			
+				URL of TeamCity Server (e.g., http://build.company.com):<br />
+				<input id="server" type="text" style="width:500px" />
+				<button onclick="save_options()">Save</button>
+			</td>
+		</tr>
+	</table>
+	
+    <p>This extension displays the status of your <a href="http://www.jetbrains.com/teamcity/index.html">TeamCity</a> continuous integration builds.</p>    
+    
+    <p>v1.2 Release Notes</p>
+    <ul>	
+    	<li>Fixed a bug where clicking the "TC" button would open multiple windows</li>
+    </ul>    
+    
+    <p>v1.1 Release Notes</p>
+    <ul>
+    	<li>"TC" icon will spin when a new build is complete</li>
+    </ul>    
+        	
+	<p>v1.0 Release Notes</p>
+	<ul>
+		<li>Has only been tested with TeamCity 5.0</li>
+		<li>Only verifies the status of the last 100 builds</li>
+	</ul>
+			
+	<p>Authored by Jim Greco (<a href="http://twitter.com/jgreco">@jgreco</a>) <br />
+	   <a href="mailto:jgreco@gmail.com">jgreco@gmail.com</a>
+	</p>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "TeamCity Build Status",
+  "version": "1.1",
+  "description": "This extension displays the status of your TeamCity continuous integration builds.",
+  "background_page": "background.html",
+  "options_page": "options.html",
+  "browser_action": {
+    "default_icon": "icon19.png",
+    "default_title": "TeamCity Build Status",
+	"popup": "popup.html"
+  },
+  "permissions": [
+    "http://*/",
+    "tabs"
+  ],
+  "icons": { "16": "icon16.png", "32": "icon32.png", "48":"icon48.png", "128":"icon128.png" }
+}

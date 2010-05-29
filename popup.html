@@ -1,0 +1,56 @@
+<html>
+	<head>
+		<link rel="stylesheet" href="screen.css" type="text/css">
+		<style type="text/css">
+			h3 { margin-bottom:0.25em; }
+		</style>
+		<script type="text/javascript" src="jquery-1.3.2.min.js"></script>
+		<script>
+			function start() {  
+				var server = localStorage["server"];
+				if(server) {
+					$("#serverLink").attr("href", server);
+				}
+				else {
+					$("#serverLink").hide();
+				}
+				
+				var builds = localStorage["builds"];
+				if(builds && builds.length > 0) {
+					for(var i=0; i<builds.length; i++) {
+						var build = builds[i];
+						$("#recentBuilds").append(
+							"<tr" + (i % 2) ? "" : " class='even'" +  ">" +
+								"<td><a href='" + build.projectUrl + "'>" + build.projectName + "</a></td>" +
+								"<td>" + build.name + "</td>" +
+								"<td>" + build.id + "</td>" +
+								"<td>" + build.status + "</td>" + 
+							"</tr>");
+					}
+				}
+				else {
+					$("#recentBuilds").append("<tr><td colspan='4'><i>No recent builds</i></tr>");
+				}
+			}
+		</script>
+	</head>
+	<body onload="start()">
+		<div>
+			<h3>Recent Builds</h3>
+			<div><a id="serverLink">My Build Server</a></div>
+			<table style="width:500px">
+				<thead>
+					<tr>
+						<th>Project</th>
+						<th>Build</th>
+						<th>ID</th>
+						<th>Status</th>
+					</tr>
+				</thead>
+				<tbody id="recentBuilds">
+								
+				</tbody>
+			</table>
+		</div>
+	</body>
+</html>
